@@ -1,45 +1,26 @@
-import { useState } from 'react'
+import { Routes, Route } from 'react-router-dom';
+import Navbar from './components/Navbar';
+import Catalog from './pages/Catalog';
+import Cart from './pages/Cart';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import { useTheme } from './context/ThemeContext';
 import './App.css';
 
-function ProductCard(props) {
-  const [count, setCount] = useState(0);
-
-  const handleAdd = () => setCount(prev => prev + 1);
-  const handleRemove = () => setCount(prev => (prev > 0 ? prev - 1 : 0));
-  const handleReset = () => setCount(0);
+export default function App() {
+  const { theme } = useTheme();
 
   return (
-    <div className="card">
-      <img
-        src="https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg"
-        className="logo react"
-        alt="React logo"
-      />
-      <h3>{props.title}</h3>
-      <p>{props.price} ₽</p>
-
-      <div className="counter-row">
-        <button onClick={handleRemove}>-</button>
-        <span>{count}</span>
-        <button onClick={handleAdd}>+</button>
-      </div>
-
-      <button className="reset-btn" onClick={handleReset}>
-        Удалить
-      </button>
+    <div className={`app theme-${theme}`}>
+      <Navbar />
+      <main className="content">
+        <Routes>
+          <Route path="/" element={<Catalog />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Routes>
+      </main>
     </div>
   );
-}
-
-export default function App() {
-  return (
-      <div className="app">
-        <h1>Каталог товаров</h1>
-        <div className="card-list">
-          <ProductCard title="Товар 1" price={1200} />
-          <ProductCard title="Товар 2" price={3400} />
-          <ProductCard title="Товар 3" price={5600} />
-        </div>
-      </div>
-    );
 }
