@@ -1,54 +1,42 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
 
 const CartContext = createContext();
 
 export function CartProvider({ children }) {
-  const [cart, setCart] = useState(() => {
-    try {
-      const savedCart = localStorage.getItem('cart');
-      return savedCart ? JSON.parse(savedCart) : [];
-    } catch (error) {
-      console.error('Ошибка чтения корзины из localStorage:', error);
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cart));
-  }, [cart]);
+  const [cart, setCart] = useState([]);
 
   const addToCart = (product) => {
-    setCart(prevCart => {
-      const existing = prevCart.find(item => item.id === product.id);
-      if (existing) {
-        return prevCart.map(item =>
+    setCart((prev) => {
+      const exists = prev.find((item) => item.id === product.id);
+      if (exists) {
+        return prev.map((item) =>
           item.id === product.id ? { ...item, count: item.count + 1 } : item
         );
       }
-      return [...prevCart, { ...product, count: 1 }];
+      return [...prev, { ...product, count: 1 }];
     });
   };
 
   const increaseCount = (id) => {
-    setCart(prevCart =>
-      prevCart.map(item =>
+    setCart((prev) =>
+      prev.map((item) =>
         item.id === id ? { ...item, count: item.count + 1 } : item
       )
     );
   };
 
   const decreaseCount = (id) => {
-    setCart(prevCart =>
-      prevCart
-        .map(item =>
+    setCart((prev) =>
+      prev
+        .map((item) =>
           item.id === id ? { ...item, count: item.count - 1 } : item
         )
-        .filter(item => item.count > 0)
+        .filter((item) => item.count > 0)
     );
   };
 
   const removeFromCart = (id) => {
-    setCart(prevCart => prevCart.filter(item => item.id !== id));
+    setCart((prev) => prev.filter((item) => item.id !== id));
   };
 
   const totalPrice = cart.reduce((sum, item) => sum + item.price * item.count, 0);
