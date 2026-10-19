@@ -29,6 +29,24 @@ export function CartProvider({ children }) {
     });
   };
 
+  const increaseCount = (id) => {
+    setCart(prevCart =>
+      prevCart.map(item =>
+        item.id === id ? { ...item, count: item.count + 1 } : item
+      )
+    );
+  };
+
+  const decreaseCount = (id) => {
+    setCart(prevCart =>
+      prevCart
+        .map(item =>
+          item.id === id ? { ...item, count: item.count - 1 } : item
+        )
+        .filter(item => item.count > 0)
+    );
+  };
+
   const removeFromCart = (id) => {
     setCart(prevCart => prevCart.filter(item => item.id !== id));
   };
@@ -36,7 +54,16 @@ export function CartProvider({ children }) {
   const totalPrice = cart.reduce((sum, item) => sum + item.price * item.count, 0);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, totalPrice }}>
+    <CartContext.Provider
+      value={{
+        cart,
+        addToCart,
+        removeFromCart,
+        increaseCount,
+        decreaseCount,
+        totalPrice,
+      }}
+    >
       {children}
     </CartContext.Provider>
   );

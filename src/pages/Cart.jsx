@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 
 export default function Cart() {
-  const { cart, removeFromCart, totalPrice } = useCart();
+  const { cart, removeFromCart, increaseCount, decreaseCount, totalPrice } = useCart();
 
   if (cart.length === 0) {
     return (
@@ -33,7 +33,25 @@ export default function Cart() {
               <tr key={item.id}>
                 <td>{item.title}</td>
                 <td>{item.price.toLocaleString()} ₽</td>
-                <td>{item.count}</td>
+                <td>
+                  <div className="quantity-controls">
+                    <button
+                      className="quantity-btn"
+                      onClick={() => decreaseCount(item.id)}
+                      title="Уменьшить"
+                    >
+                      −
+                    </button>
+                    <span className="quantity-value">{item.count}</span>
+                    <button
+                      className="quantity-btn"
+                      onClick={() => increaseCount(item.id)}
+                      title="Увеличить"
+                    >
+                      +
+                    </button>
+                  </div>
+                </td>
                 <td>{(item.price * item.count).toLocaleString()} ₽</td>
                 <td>
                   <button className="delete-btn" onClick={() => removeFromCart(item.id)}>

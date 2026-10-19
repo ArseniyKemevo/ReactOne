@@ -2,12 +2,12 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 
 const PRODUCTS = [
-  { id: 1, title: 'Механическая клавиатура', price: 4500 },
-  { id: 2, title: 'Беспроводная мышь', price: 2300 },
-  { id: 3, title: 'Игровой монитор 144Hz', price: 18900},
-  { id: 4, title: 'Гарнитура с микрофоном', price: 5400 },
-  { id: 5, title: 'Коврик для мыши XXL', price: 1200 },
-  { id: 6, title: 'USB-хаб Type-C', price: 1900 },
+  { id: 1, title: 'Механическая клавиатура', price: 4500, image: '/images/keyboard.jpg' },
+  { id: 2, title: 'Беспроводная мышь', price: 2300, image: '/images/mouse.png' },
+  { id: 3, title: 'Игровой монитор 144Hz', price: 18900, image: '/images/monitor.jpg' },
+  { id: 4, title: 'Гарнитура с микрофоном', price: 5400, image: '/images/yshi.jpg' },
+  { id: 5, title: 'Коврик для мыши XXL', price: 1200, image: '/images/kover.jpg' },
+  { id: 6, title: 'USB-хаб Type-C', price: 1900, image: '/images/hub.jpg' },
 ];
 
 export default function Catalog() {
@@ -26,7 +26,7 @@ export default function Catalog() {
         {PRODUCTS.map(product => (
           <div key={product.id} className="card">
             <img
-              src="https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg"
+              src={product.image}
               className="logo react"
               alt="Товар"
             />
