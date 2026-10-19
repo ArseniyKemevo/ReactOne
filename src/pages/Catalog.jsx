@@ -4,7 +4,7 @@ import { useCart } from '../context/CartContext';
 const PRODUCTS = [
   { id: 1, title: 'Механическая клавиатура', price: 4500 },
   { id: 2, title: 'Беспроводная мышь', price: 2300 },
-  { id: 3, title: 'Игровой монитор 144Hz', price: 18900 },
+  { id: 3, title: 'Игровой монитор 144Hz', price: 18900},
   { id: 4, title: 'Гарнитура с микрофоном', price: 5400 },
   { id: 5, title: 'Коврик для мыши XXL', price: 1200 },
   { id: 6, title: 'USB-хаб Type-C', price: 1900 },
