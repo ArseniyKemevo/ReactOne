@@ -1,46 +1,167 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-
-const PRODUCTS = [
-  { id: 1, title: 'Механическая клавиатура', price: 4500, image: '/images/keyboard.jpg' },
-  { id: 2, title: 'Беспроводная мышь', price: 2300, image: '/images/mouse.png' },
-  { id: 3, title: 'Игровой монитор 144Hz', price: 18900, image: '/images/monitor.jpg' },
-  { id: 4, title: 'Гарнитура с микрофоном', price: 5400, image: '/images/yshi.jpg' },
-  { id: 5, title: 'Коврик для мыши XXL', price: 1200, image: '/images/kover.jpg' },
-  { id: 6, title: 'USB-хаб Type-C', price: 1900, image: '/images/hub.jpg' },
-];
+import { useData } from '../context/DataContext';
 
 export default function Catalog() {
   const { addToCart } = useCart();
+  const { services, categories, currentUser, loading, error, addCategory, fetchInitialData } = useData();
   const navigate = useNavigate();
 
-  const handleAddAndRedirect = (product) => {
-    addToCart(product);
+  // Выбранные чекбоксы категорий
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [categoryError, setCategoryError] = useState('');
+
+  const handleCheckboxChange = (categoryId) => {
+    setSelectedCategories((prev) =>
+      prev.includes(categoryId)
+        ? prev.filter((id) => id !== categoryId)
+        : [...prev, categoryId]
+    );
+  };
+
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    setCategoryError('');
+    if (!newCategoryName.trim()) {
+      setCategoryError('Введите название категории');
+      return;
+    }
+    const res = await addCategory(newCategoryName);
+    if (res.success) {
+      setNewCategoryName('');
+    } else {
+      setCategoryError(res.message);
+    }
+  };
+
+  const handleAddAndRedirect = (service) => {
+    addToCart(service);
     navigate('/cart');
   };
 
+  const filteredServices =
+    selectedCategories.length === 0
+      ? services
+      : services.filter((service) => selectedCategories.includes(service.category_id));
+
   return (
-    <div>
-      <h1>Каталог товаров</h1>
-      <div className="card-list">
-        {PRODUCTS.map(product => (
-          <div key={product.id} className="card">
-            <img
-              src={product.image}
-              className="logo react"
-              alt="Товар"
-            />
-            <h3>{product.title}</h3>
-            <p className="price">{product.price.toLocaleString()} ₽</p>
-            <div className="card-actions">
-              <button onClick={() => addToCart(product)}>В корзину</button>
-              <button className="btn-secondary" onClick={() => handleAddAndRedirect(product)}>
-                Купить и перейти
-              </button>
-            </div>
+    <div className="catalog-page">
+      <div className="catalog-header">
+        <h1>Каталог услуг салона</h1>
+        {currentUser && (
+          <div className="user-coupon-banner">
+            Ваш активный купон: <strong>{currentUser.coupon_code || 'Нет'}</strong> (персональная скидка <strong>{currentUser.personal_discount || 0}%</strong> в корзине)
           </div>
-        ))}
+        )}
       </div>
+
+      {/* Состояние загрузки */}
+      {loading && <div className="status-box loading-box">Загрузка каталога услуг с сервера API...</div>}
+
+      {/* Сообщение об ошибке / предупреждение API */}
+      {error && (
+        <div className="status-box error-box">
+          <span>{error}</span>
+          <button className="btn-secondary" onClick={fetchInitialData}>Повторить запрос</button>
+        </div>
+      )}
+
+      {!loading && (
+        <div className="catalog-layout">
+          {/* Боковая панель фильтрации категорий (aside с checkbox по ТЗ) */}
+          <aside className="categories-aside">
+            <h3>Категории услуг</h3>
+            <div className="checkbox-list">
+              {categories.map((cat) => (
+                <label key={cat.id} className="checkbox-item">
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes(cat.id)}
+                    onChange={() => handleCheckboxChange(cat.id)}
+                  />
+                  <span>{cat.name}</span>
+                </label>
+              ))}
+            </div>
+
+            {selectedCategories.length > 0 && (
+              <button
+                className="reset-btn full-width-btn"
+                onClick={() => setSelectedCategories([])}
+              >
+                Сбросить фильтры
+              </button>
+            )}
+
+            {/* Добавление категории администратором прямо в aside */}
+            {currentUser?.role === 'admin' && (
+              <form onSubmit={handleAddCategory} className="aside-admin-form">
+                <h4>+ Добавить категорию (Админ)</h4>
+                <input
+                  type="text"
+                  placeholder="Название категории"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                />
+                {categoryError && <p className="field-error">{categoryError}</p>}
+                <button type="submit" className="submit-btn">Добавить</button>
+              </form>
+            )}
+          </aside>
+
+          {/* Основной список услуг */}
+          <section className="catalog-main">
+            {filteredServices.length === 0 ? (
+              <p>По выбранным категориям услуг не найдено.</p>
+            ) : (
+              <div className="card-list">
+                {filteredServices.map((service) => {
+                  const hasDiscount = service.discount_percent > 0;
+                  const finalPrice = Math.round(
+                    service.price * (1 - (service.discount_percent || 0) / 100)
+                  );
+                  const categoryObj = categories.find((c) => c.id === service.category_id);
+
+                  return (
+                    <div key={service.id} className="card service-card">
+                      {hasDiscount && (
+                        <span className="discount-badge">Скидка −{service.discount_percent}%</span>
+                      )}
+                      <span className="category-tag">{categoryObj?.name || 'Услуга'}</span>
+                      <h3>{service.title}</h3>
+                      <p className="service-desc">{service.description}</p>
+                      <p className="service-duration">⏱ Длительность: {service.duration} мин.</p>
+
+                      <div className="price-block">
+                        {hasDiscount ? (
+                          <>
+                            <span className="old-price">{service.price.toLocaleString()} ₽</span>
+                            <span className="price discount-price">{finalPrice.toLocaleString()} ₽</span>
+                          </>
+                        ) : (
+                          <span className="price">{service.price.toLocaleString()} ₽</span>
+                        )}
+                      </div>
+
+                      <div className="card-actions">
+                        <button onClick={() => addToCart(service)}>В корзину</button>
+                        <button
+                          className="btn-secondary"
+                          onClick={() => handleAddAndRedirect(service)}
+                        >
+                          Записаться сейчас
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }
