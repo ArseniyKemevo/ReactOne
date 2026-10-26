@@ -1,26 +1,36 @@
 import { NavLink } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
 import { useCart } from '../context/CartContext';
+import { useTheme } from '../context/ThemeContext';
+import { useData } from '../context/DataContext';
 
 export default function Navbar() {
-  const { theme, toggleTheme } = useTheme();
   const { cart } = useCart();
+  const { theme, toggleTheme } = useTheme();
+  const { user } = useData();
 
-  const totalItemsCount = cart.reduce((acc, item) => acc + item.count, 0);
+  const totalCount = cart.reduce((sum, item) => sum + item.count, 0);
 
   return (
     <nav className="navbar">
+      <h2>TechStore</h2>
       <div className="nav-links">
-        <NavLink to="/" end>Каталог</NavLink>
+        <NavLink to="/">Каталог</NavLink>
         <NavLink to="/cart">
-          Корзина {totalItemsCount > 0 && <span className="cart-badge">{totalItemsCount}</span>}
+          Корзина
+          {totalCount > 0 && <span className="cart-badge">{totalCount}</span>}
         </NavLink>
-        <NavLink to="/login">Вход</NavLink>
-        <NavLink to="/dashboard">Кабинет</NavLink>
+        {user ? (
+          <NavLink to="/dashboard">Профиль ({user.full_name})</NavLink>
+        ) : (
+          <>
+            <NavLink to="/login">Вход</NavLink>
+            <NavLink to="/register">Регистрация</NavLink>
+          </>
+        )}
+        <button onClick={toggleTheme}>
+          {theme === 'light' ? 'Темная тема' : 'Светлая тема'}
+        </button>
       </div>
-      <button className="theme-toggle-btn" onClick={toggleTheme}>
-        {theme === 'light' ? 'Тёмная тема' : 'Светлая тема'}
-      </button>
     </nav>
   );
 }

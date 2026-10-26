@@ -4,149 +4,161 @@ import { useCart } from '../context/CartContext';
 import { useData } from '../context/DataContext';
 
 export default function Cart() {
-  const {
-    cart,
-    removeFromCart,
-    increaseCount,
-    decreaseCount,
-    clearCart,
-    subtotalPrice,
-    userDiscountPercent,
-    userDiscountAmount,
-    totalPrice,
-  } = useCart();
-  const { currentUser } = useData();
-  const [checkoutStatus, setCheckoutStatus] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
+  const { user } = useData();
+  const [statusMsg, setStatusMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const getDiscountedPrice = (item) => {
+    const basePrice = Number(item.price);
+    const itemDiscount = Number(item.discount_percent) || 0;
+    const userDiscount = user ? Number(user.personal_discount) || 0 : 0;
+    const totalDiscount = Math.min(itemDiscount + userDiscount, 90);
+    return Math.round(basePrice * (1 - totalDiscount / 100));
+  };
+
+  const totalAmount = cart.reduce(
+    (sum, item) => sum + getDiscountedPrice(item) * item.count,
+    0
+  );
 
   const handleCheckout = async () => {
-    setIsSubmitting(true);
-    setCheckoutStatus(null);
+    setLoading(true);
+    setStatusMsg('');
+    setErrorMsg('');
     try {
       const res = await fetch('http://localhost:5000/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: currentUser?.id || null,
+          user_id: user ? user.id : null,
           items: cart,
-          total_amount: totalPrice,
+          total_amount: totalAmount,
         }),
       });
-      if (!res.ok) throw new Error('Сервер API недоступен, заказ сохранен локально');
       const data = await res.json();
-      setCheckoutStatus({ type: 'success', text: data.message });
+      if (!res.ok) {
+        throw new Error(data.error || 'Ошибка оформления заказа');
+      }
+      setStatusMsg(data.message);
       clearCart();
-    } catch {
-      setCheckoutStatus({
-        type: 'success',
-        text: 'Запись на услуги и платеж успешно оформлены!',
-      });
-      clearCart();
+    } catch (err) {
+      setErrorMsg(err.message);
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
-  if (cart.length === 0) {
-    return (
-      <div className="cart-empty">
-        <h2>Корзина пуста</h2>
-        {checkoutStatus && (
-          <div className="status-box success-box">{checkoutStatus.text}</div>
-        )}
-        <p>Выберите услуги в нашем каталоге.</p>
-        <Link to="/" className="btn-link">Перейти к каталогу услуг</Link>
-      </div>
-    );
-  }
-
   return (
-    <div className="cart-page">
-      <h1>Корзина выбранных услуг</h1>
-      <div className="cart-table-wrapper">
-        <table className="cart-table">
-          <thead>
-            <tr>
-              <th>Услуга</th>
-              <th>Длительность</th>
-              <th>Цена со скидкой</th>
-              <th>Кол-во</th>
-              <th>Сумма</th>
-              <th>Действие</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cart.map((item) => (
-              <tr key={item.id}>
-                <td>
-                  <strong>{item.title}</strong>
-                  {item.discount_percent > 0 && (
-                    <span className="table-discount-badge">−{item.discount_percent}%</span>
-                  )}
-                </td>
-                <td>{item.duration} мин.</td>
-                <td>
-                  {item.discount_percent > 0 ? (
-                    <>
-                      <span className="old-price-inline">{item.price.toLocaleString()} ₽</span>{' '}
-                      <strong>{item.finalUnitPrice.toLocaleString()} ₽</strong>
-                    </>
-                  ) : (
-                    `${item.price.toLocaleString()} ₽`
-                  )}
-                </td>
-                <td>
-                  <div className="quantity-controls">
-                    <button
-                      className="quantity-btn"
-                      onClick={() => decreaseCount(item.id)}
-                      title="Уменьшить"
-                    >
-                      −
-                    </button>
-                    <span className="quantity-value">{item.count}</span>
-                    <button
-                      className="quantity-btn"
-                      onClick={() => increaseCount(item.id)}
-                      title="Увеличить"
-                    >
-                      +
-                    </button>
-                  </div>
-                </td>
-                <td>{(item.finalUnitPrice * item.count).toLocaleString()} ₽</td>
-                <td>
-                  <button className="delete-btn" onClick={() => removeFromCart(item.id)}>
-                    Удалить
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div>
+      <h1>Корзина</h1>
 
-      <div className="cart-summary">
-        <p>Сумма услуг (с учетом скидок каталога): <strong>{subtotalPrice.toLocaleString()} ₽</strong></p>
-        {currentUser ? (
-          <p>
-            Персональный купон <strong>{currentUser.coupon_code}</strong> (−{userDiscountPercent}%):{' '}
-            <strong>−{userDiscountAmount.toLocaleString()} ₽</strong>
-          </p>
-        ) : (
-          <p className="muted-hint">
-            <Link to="/login">Авторизуйтесь</Link>, чтобы применить персональный скидочный купон!
-          </p>
-        )}
-        <h2>Итого к оплате: {totalPrice.toLocaleString()} ₽</h2>
-        <button
-          className="submit-btn"
-          disabled={isSubmitting}
-          onClick={handleCheckout}
-        >
-          {isSubmitting ? 'Оформление...' : 'Оформить запись и оплатить'}
-        </button>
-      </div>
+      {statusMsg && (
+        <div className="status-box success-box">
+          <span>{statusMsg}</span>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="status-box error-box">
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {cart.length === 0 ? (
+        <div>
+          <p>Ваша корзина пуста.</p>
+          <Link to="/" className="btn-link">
+            Перейти в каталог
+          </Link>
+        </div>
+      ) : (
+        <>
+          <div className="cart-table-wrapper">
+            <table className="cart-table">
+              <thead>
+                <tr>
+                  <th>Наименование</th>
+                  <th>Цена</th>
+                  <th>Количество</th>
+                  <th>Сумма</th>
+                  <th>Действие</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cart.map((item) => {
+                  const finalPrice = getDiscountedPrice(item);
+                  const basePrice = Number(item.price);
+
+                  return (
+                    <tr key={item.id}>
+                      <td>
+                        {item.title}
+                        {finalPrice < basePrice && (
+                          <span className="table-discount-badge">Скидка</span>
+                        )}
+                      </td>
+                      <td>
+                        {finalPrice < basePrice ? (
+                          <>
+                            <span className="old-price-inline">{basePrice} ₽</span>{' '}
+                            <strong>{finalPrice} ₽</strong>
+                          </>
+                        ) : (
+                          <span>{basePrice} ₽</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="quantity-controls">
+                          <button
+                            className="quantity-btn"
+                            onClick={() => updateQuantity(item.id, -1)}
+                          >
+                            -
+                          </button>
+                          <span className="quantity-value">{item.count}</span>
+                          <button
+                            className="quantity-btn"
+                            onClick={() => updateQuantity(item.id, 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </td>
+                      <td>{finalPrice * item.count} ₽</td>
+                      <td>
+                        <button
+                          className="delete-btn"
+                          onClick={() => removeFromCart(item.id)}
+                        >
+                          Удалить
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="cart-summary">
+            <h2>Итого к оплате: {totalAmount} ₽</h2>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button className="reset-btn" onClick={clearCart}>
+                Очистить корзину
+              </button>
+              <button
+                className="submit-btn"
+                onClick={handleCheckout}
+                disabled={loading}
+              >
+                {loading ? 'Оформление...' : 'Оформить заказ'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

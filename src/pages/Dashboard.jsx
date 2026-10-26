@@ -1,145 +1,155 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useData, COUPON_TYPES } from '../context/DataContext';
+import { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useData } from '../context/DataContext';
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-  const {
-    currentUser,
-    logoutUser,
-    users,
-    services,
-    updateServiceDiscount,
-    assignUserDiscount,
-  } = useData();
+  const { user, logoutUser, services, fetchData } = useData();
+  const [usersList, setUsersList] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [couponCode, setCouponCode] = useState('WELCOME10');
+  const [personalDiscount, setPersonalDiscount] = useState(10);
+  const [adminMsg, setAdminMsg] = useState('');
 
-  const [selectedUserId, setSelectedUserId] = useState(users[0]?.id || 1);
-  const [selectedCoupon, setSelectedCoupon] = useState('WELCOME10');
-  const [customDiscount, setCustomDiscount] = useState(10);
-  const [adminMessage, setAdminMessage] = useState('');
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      fetch('http://localhost:5000/api/users')
+        .then((res) => res.json())
+        .then((data) => {
+          setUsersList(data);
+          if (data.length > 0) {
+            setSelectedUserId(data[0].id);
+          }
+        });
+    }
+  }, [user]);
 
-  if (!currentUser) {
-    return (
-      <div className="dashboard-card">
-        <h1>Личный кабинет</h1>
-        <p>Вы не авторизованы. Пожалуйста, войдите в систему.</p>
-        <Link to="/login" className="btn-link">Перейти ко входу</Link>
-      </div>
-    );
+  if (!user) {
+    return <Navigate to="/login" />;
   }
 
-  const handleLogout = () => {
-    logoutUser();
-    navigate('/login');
-  };
-
-  const handleCouponChange = (code) => {
-    setSelectedCoupon(code);
-    const found = COUPON_TYPES.find((c) => c.code === code);
-    if (found) setCustomDiscount(found.discount);
-  };
-
-  const handleAssignUserDiscount = async (e) => {
+  const handleUserDiscountUpdate = async (e) => {
     e.preventDefault();
-    await assignUserDiscount(selectedUserId, selectedCoupon, customDiscount);
-    setAdminMessage('Персональная скидка и купон успешно назначены пользователю!');
-    setTimeout(() => setAdminMessage(''), 3000);
+    setAdminMsg('');
+    const res = await fetch(`http://localhost:5000/api/users/${selectedUserId}/discount`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        coupon_code: couponCode,
+        personal_discount: personalDiscount,
+      }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setUsersList(usersList.map((u) => (u.id === updated.id ? { ...u, ...updated } : u)));
+      setAdminMsg('Персональная скидка пользователя обновлена');
+    }
   };
 
-  const discountedCount = services.filter((s) => s.discount_percent > 0).length;
-  const discountedRatio = services.length
-    ? Math.round((discountedCount / services.length) * 100)
-    : 0;
+  const handleServiceDiscountChange = async (serviceId, discountValue) => {
+    setAdminMsg('');
+    const res = await fetch(`http://localhost:5000/api/services/${serviceId}/discount`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ discount_percent: discountValue }),
+    });
+    if (res.ok) {
+      fetchData();
+      setAdminMsg('Скидка на позицию обновлена');
+    }
+  };
 
   return (
-    <div className="dashboard-wrapper">
+    <div>
       <div className="dashboard-card">
-        <div className="dashboard-avatar">
-          {currentUser.full_name.charAt(0).toUpperCase()}
-        </div>
+        <div className="dashboard-avatar">{user.full_name[0]}</div>
         <h1>Личный кабинет</h1>
-        <p>Имя: <strong>{currentUser.full_name}</strong></p>
-        <p>Email: <strong>{currentUser.email}</strong></p>
-        <p>Роль: <strong>{currentUser.role === 'admin' ? 'Администратор' : 'Клиент'}</strong></p>
-        <p>
-          Присвоенный купон: <strong>{currentUser.coupon_code || 'NONE'}</strong> (скидка{' '}
-          <strong>{currentUser.personal_discount || 0}%</strong>)
-        </p>
-        <button className="reset-btn" onClick={handleLogout}>
+        <p>Имя: <strong>{user.full_name}</strong></p>
+        <p>Email: <strong>{user.email}</strong></p>
+        <p>Роль: <strong>{user.role === 'admin' ? 'Администратор' : 'Клиент'}</strong></p>
+        <p>Купон: <strong>{user.coupon_code}</strong></p>
+        <p>Персональная скидка: <strong>{user.personal_discount}%</strong></p>
+        <button className="reset-btn" onClick={logoutUser}>
           Выйти из аккаунта
         </button>
       </div>
 
-      {/* Панель управления скидками для Администратора (по п. 5 ТЗ) */}
-      {currentUser.role === 'admin' && (
+      {user.role === 'admin' && (
         <div className="admin-panel">
-          <h2>Панель администратора: управление скидками</h2>
-          {adminMessage && <div className="status-box success-box">{adminMessage}</div>}
+          <h2>Панель управления скидками (Администратор)</h2>
+          {adminMsg && (
+            <div className="status-box success-box">
+              <span>{adminMsg}</span>
+            </div>
+          )}
 
           <div className="admin-grid">
-            {/* Блок 1: Назначение персонального купона и скидки пользователю */}
-            <div className="admin-section">
-              <h3>1. Выдать персональную скидку / купон клиенту</h3>
-              <form onSubmit={handleAssignUserDiscount} className="login-form">
+            <div>
+              <h3>Назначить купон пользователю</h3>
+              <form className="login-form" onSubmit={handleUserDiscountUpdate}>
                 <div className="form-group">
-                  <label>Пользователь:</label>
+                  <label>Пользователь</label>
                   <select
                     value={selectedUserId}
-                    onChange={(e) => setSelectedUserId(Number(e.target.value))}
+                    onChange={(e) => setSelectedUserId(e.target.value)}
                   >
-                    {users.map((u) => (
+                    {usersList.map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.full_name} ({u.email}) — сейчас: {u.coupon_code} ({u.personal_discount}%)
+                        {u.full_name} ({u.email}) — {u.coupon_code} ({u.personal_discount}%)
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label>Вид скидочного купона:</label>
+                  <label>Вид купона</label>
                   <select
-                    value={selectedCoupon}
-                    onChange={(e) => handleCouponChange(e.target.value)}
+                    value={couponCode}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCouponCode(val);
+                      if (val === 'NONE') setPersonalDiscount(0);
+                      if (val === 'PROMO5') setPersonalDiscount(5);
+                      if (val === 'WELCOME10') setPersonalDiscount(10);
+                      if (val === 'VIP20') setPersonalDiscount(20);
+                    }}
                   >
-                    {COUPON_TYPES.map((c) => (
-                      <option key={c.code} value={c.code}>{c.label}</option>
-                    ))}
+                    <option value="NONE">Без купона (0%)</option>
+                    <option value="PROMO5">PROMO5 (5%)</option>
+                    <option value="WELCOME10">WELCOME10 (10%)</option>
+                    <option value="VIP20">VIP20 (20%)</option>
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label>Персональная скидка (%):</label>
+                  <label>Персональная скидка (%)</label>
                   <input
                     type="number"
                     min="0"
-                    max="100"
-                    value={customDiscount}
-                    onChange={(e) => setCustomDiscount(e.target.value)}
+                    max="90"
+                    value={personalDiscount}
+                    onChange={(e) => setPersonalDiscount(e.target.value)}
                   />
                 </div>
 
                 <button type="submit" className="submit-btn">
-                  Назначить купон и скидку
+                  Сохранить скидку
                 </button>
               </form>
             </div>
 
-            {/* Блок 2: Назначение общей скидки на услуги (контроль 30% товаров со скидкой) */}
-            <div className="admin-section">
-              <h3>
-                2. Общие скидки на услуги (сейчас со скидкой: {discountedCount} из {services.length} — {discountedRatio}%)
-              </h3>
+            <div>
+              <h3>Скидки на товары и услуги</h3>
               <div className="admin-services-list">
-                {services.map((srv) => (
-                  <div key={srv.id} className="admin-service-row">
-                    <span>{srv.title} ({srv.price} ₽)</span>
+                {services.map((s) => (
+                  <div key={s.id} className="admin-service-row">
+                    <span>{s.title}</span>
                     <div className="admin-discount-input">
                       <input
                         type="number"
                         min="0"
                         max="90"
-                        value={srv.discount_percent}
-                        onChange={(e) => updateServiceDiscount(srv.id, e.target.value)}
+                        defaultValue={s.discount_percent}
+                        onBlur={(e) => handleServiceDiscountChange(s.id, e.target.value)}
                       />
                       <span>%</span>
                     </div>

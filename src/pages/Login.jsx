@@ -1,81 +1,101 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [formError, setFormError] = useState('');
-  const { loginUser, loading } = useData();
+  const { loginUser } = useData();
   const navigate = useNavigate();
 
-  const validateForm = () => {
-    if (!email.trim() || !password.trim()) {
-      setFormError('Пожалуйста, заполните поля Email и Пароль.');
-      return false;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      setFormError('Введите корректный адрес электронной почты (например, client@salon.ru).');
-      return false;
-    }
-    if (password.length < 4) {
-      setFormError('Пароль должен содержать не менее 4 символов.');
-      return false;
-    }
-    return true;
-  };
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [serverError, setServerError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setFormError('');
+    setEmailError('');
+    setPasswordError('');
+    setServerError('');
 
-    if (!validateForm()) return;
+    let valid = true;
+    if (!email.trim()) {
+      setEmailError('Введите email');
+      valid = false;
+    } else if (!email.includes('@')) {
+      setEmailError('Некорректный формат email');
+      valid = false;
+    }
 
-    const result = await loginUser(email, password);
-    if (result.success) {
+    if (!password.trim()) {
+      setPasswordError('Введите пароль');
+      valid = false;
+    }
+
+    if (!valid) return;
+
+    setLoading(true);
+    try {
+      await loginUser(email.trim(), password);
       navigate('/dashboard');
-    } else {
-      setFormError(result.message || 'Ошибка авторизации. Проверьте введённые данные.');
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="form-container">
-      <h1>Вход в систему</h1>
+      <h1>Авторизация</h1>
 
-      {formError && <div className="status-box error-box">{formError}</div>}
+      {serverError && (
+        <div className="status-box error-box">
+          <span>{serverError}</span>
+        </div>
+      )}
 
-      <form onSubmit={handleLogin} className="login-form" noValidate>
+      <form className="login-form" onSubmit={handleSubmit} noValidate>
         <div className="form-group">
-          <label htmlFor="email">Email:</label>
+          <label>Email</label>
           <input
-            id="email"
             type="email"
+            placeholder="admin@techstore.ru"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin@salon.ru или client@salon.ru"
           />
+          {emailError && <p className="field-error">{emailError}</p>}
         </div>
+
         <div className="form-group">
-          <label htmlFor="pwd">Пароль:</label>
+          <label>Пароль</label>
           <input
-            id="pwd"
             type="password"
+            placeholder="Введите пароль"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Введите пароль (например, admin123)"
           />
+          {passwordError && <p className="field-error">{passwordError}</p>}
         </div>
+
         <button type="submit" className="submit-btn" disabled={loading}>
-          {loading ? 'Проверка данных...' : 'Войти'}
+          {loading ? 'Вход...' : 'Войти'}
         </button>
       </form>
 
+      <div style={{ marginTop: '1.2rem', textAlign: 'center' }}>
+        <span>Нет аккаунта? </span>
+        <Link to="/register" style={{ color: 'var(--accent-color)' }}>
+          Зарегистрироваться
+        </Link>
+      </div>
+
       <div className="demo-credentials">
-        <p><strong>Тестовые аккаунты:</strong></p>
-        <p>Админ: <code>admin@salon.ru</code> / <code>admin123</code></p>
-        <p>Клиент: <code>client@salon.ru</code> / <code>client123</code></p>
+        <p><strong>Тестовые аккаунты из БД:</strong></p>
+        <p>Админ: admin@techstore.ru / admin123</p>
+        <p>Клиент 1: client@techstore.ru / client123</p>
+        <p>Клиент 2: oleg@techstore.ru / oleg123</p>
       </div>
     </div>
   );
