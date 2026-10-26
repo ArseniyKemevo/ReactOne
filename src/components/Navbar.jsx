@@ -15,10 +15,18 @@ export default function Navbar() {
       <h2>TechStore</h2>
       <div className="nav-links">
         <NavLink to="/">Каталог</NavLink>
-        <NavLink to="/cart">
-          Корзина
-          {totalCount > 0 && <span className="cart-badge">{totalCount}</span>}
-        </NavLink>
+        
+        {(!user || user.role !== 'admin') && (
+          <NavLink to="/cart">
+            Корзина
+            {totalCount > 0 && <span className="cart-badge">{totalCount}</span>}
+          </NavLink>
+        )}
+
+        {user && user.role === 'admin' && (
+          <NavLink to="/admin">Админ-панель</NavLink>
+        )}
+
         {user ? (
           <NavLink to="/dashboard">Профиль ({user.full_name})</NavLink>
         ) : (
@@ -27,6 +35,7 @@ export default function Navbar() {
             <NavLink to="/register">Регистрация</NavLink>
           </>
         )}
+
         <button onClick={toggleTheme}>
           {theme === 'light' ? 'Темная тема' : 'Светлая тема'}
         </button>

@@ -5,6 +5,7 @@ import Cart from './pages/Cart';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import Admin from './pages/Admin';
 import { useTheme } from './context/ThemeContext';
 import './App.css';
 
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/admin" element={<Admin />} />
         </Routes>
       </main>
     </div>

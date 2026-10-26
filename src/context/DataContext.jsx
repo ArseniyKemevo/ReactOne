@@ -56,6 +56,32 @@ export function DataProvider({ children }) {
     setCategories([...categories, data]);
   };
 
+  const updateCategory = async (id, name) => {
+    const res = await fetch(`http://localhost:5000/api/categories/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Ошибка обновления категории');
+    }
+    setCategories(categories.map((c) => (c.id === Number(id) ? data : c)));
+    fetchData();
+  };
+
+  const deleteCategory = async (id) => {
+    const res = await fetch(`http://localhost:5000/api/categories/${id}`, {
+      method: 'DELETE',
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Ошибка удаления категории');
+    }
+    setCategories(categories.filter((c) => c.id !== Number(id)));
+    fetchData();
+  };
+
   const registerUser = async (email, password, full_name) => {
     const res = await fetch('http://localhost:5000/api/register', {
       method: 'POST',
@@ -101,6 +127,8 @@ export function DataProvider({ children }) {
         error,
         fetchData,
         addCategory,
+        updateCategory,
+        deleteCategory,
         registerUser,
         loginUser,
         logoutUser,

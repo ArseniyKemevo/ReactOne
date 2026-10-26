@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useData } from '../context/DataContext';
 
@@ -9,6 +9,24 @@ export default function Cart() {
   const [statusMsg, setStatusMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+
+  if (user && user.role === 'admin') {
+    return <Navigate to="/admin" />;
+  }
+
+  const getServiceImage = (service) => {
+    if (service.image && service.image !== '/images/hardware.jpg') {
+      return service.image;
+    }
+    const title = (service.title || '').toLowerCase();
+    if (title.includes('мышь')) return '/images/mouse.png';
+    if (title.includes('клавиатур')) return '/images/keyboard.jpg';
+    if (title.includes('монитор')) return '/images/monitor.jpg';
+    if (title.includes('коврик')) return '/images/kover.jpg';
+    if (title.includes('хаб') || title.includes('ssd') || title.includes('память') || title.includes('сборка')) return '/images/hub.jpg';
+    if (title.includes('наушник') || title.includes('гарнитур')) return '/images/yshi.jpg';
+    return '/images/hardware.jpg';
+  };
 
   const getDiscountedPrice = (item) => {
     const basePrice = Number(item.price);
@@ -94,10 +112,28 @@ export default function Cart() {
                   return (
                     <tr key={item.id}>
                       <td>
-                        {item.title}
-                        {finalPrice < basePrice && (
-                          <span className="table-discount-badge">Скидка</span>
-                        )}
+                        <div className="cart-item-cell">
+                          <img
+                            className="cart-item-img"
+                            src={getServiceImage(item)}
+                            alt={item.title}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = '/images/hub.jpg';
+                            }}
+                          />
+                          <div>
+                            <div>
+                              <strong>{item.title}</strong>
+                              {finalPrice < basePrice && (
+                                <span className="table-discount-badge">Скидка</span>
+                              )}
+                            </div>
+                            <small style={{ color: 'var(--text-muted)' }}>
+                              {item.category_name}
+                            </small>
+                          </div>
+                        </div>
                       </td>
                       <td>
                         {finalPrice < basePrice ? (
