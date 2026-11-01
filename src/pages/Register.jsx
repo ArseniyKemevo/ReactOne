@@ -1,57 +1,77 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useData } from '../context/DataContext';
+import { useData, API_URL } from '../context/DataContext';
 
 export default function Register() {
-  const { registerUser } = useData();
+  const { user, setUser } = useData();
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [defaultAddress, setDefaultAddress] = useState('');
   const [password, setPassword] = useState('');
-  const [nameError, setNameError] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [serverError, setServerError] = useState('');
+
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
+
+  const validateForm = () => {
+    if (!fullName.trim() || fullName.trim().length < 3) {
+      return 'Введите корректное полное имя (минимум 3 символа)';
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return 'Введите корректный адрес электронной почты (например, user@mail.ru)';
+    }
+    const phoneRegex = /^\+?[0-9\s\-()]{10,18}$/;
+    if (!phoneRegex.test(phone.trim())) {
+      return 'Введите корректный номер телефона (минимум 10 цифр)';
+    }
+    if (defaultAddress.trim() && defaultAddress.trim().length < 5) {
+      return 'Адрес доставки должен содержать минимум 5 символов';
+    }
+    if (!password || password.length < 6) {
+      return 'Пароль должен содержать минимум 6 символов';
+    }
+    return null;
+  };
+
+  const handleRegister = async (e) => {
     e.preventDefault();
-    setNameError('');
-    setEmailError('');
-    setPasswordError('');
-    setServerError('');
+    setError('');
 
-    let valid = true;
-    if (!fullName.trim()) {
-      setNameError('Введите ваше имя');
-      valid = false;
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
     }
-
-    if (!email.trim()) {
-      setEmailError('Введите email');
-      valid = false;
-    } else if (!email.includes('@')) {
-      setEmailError('Некорректный формат email');
-      valid = false;
-    }
-
-    if (!password.trim()) {
-      setPasswordError('Введите пароль');
-      valid = false;
-    } else if (password.length < 4) {
-      setPasswordError('Пароль должен быть не менее 4 символов');
-      valid = false;
-    }
-
-    if (!valid) return;
 
     setLoading(true);
     try {
-      await registerUser(email.trim(), password, fullName.trim());
+      const res = await fetch(`${API_URL}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: fullName.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          default_address: defaultAddress.trim(),
+          password
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка при регистрации');
+
+      setUser(data);
       navigate('/dashboard');
     } catch (err) {
-      setServerError(err.message);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -60,45 +80,61 @@ export default function Register() {
   return (
     <div className="form-container">
       <h1>Регистрация</h1>
+      {error && <div className="status-box error-box">{error}</div>}
 
-      {serverError && (
-        <div className="status-box error-box">
-          <span>{serverError}</span>
-        </div>
-      )}
-
-      <form className="login-form" onSubmit={handleSubmit} noValidate>
+      <form onSubmit={handleRegister} className="login-form" noValidate>
         <div className="form-group">
-          <label>Имя и фамилия</label>
+          <label>Полное имя (ФИО) *</label>
           <input
             type="text"
-            placeholder="Иван Иванов"
+            placeholder="Иванов Иван Иванович"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
+            required
           />
-          {nameError && <p className="field-error">{nameError}</p>}
         </div>
 
         <div className="form-group">
-          <label>Email</label>
+          <label>Email *</label>
           <input
             type="email"
-            placeholder="user@techstore.ru"
+            placeholder="ivanov@mail.ru"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
           />
-          {emailError && <p className="field-error">{emailError}</p>}
         </div>
 
         <div className="form-group">
-          <label>Пароль</label>
+          <label>Телефон (нужен для восстановления пароля) *</label>
+          <input
+            type="tel"
+            placeholder="+79991234567"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Адрес доставки по умолчанию</label>
+          <input
+            type="text"
+            placeholder="г. Москва, ул. Озерная, д. 5"
+            value={defaultAddress}
+            onChange={(e) => setDefaultAddress(e.target.value)}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Пароль (минимум 6 символов) *</label>
           <input
             type="password"
             placeholder="Придумайте пароль"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
           />
-          {passwordError && <p className="field-error">{passwordError}</p>}
         </div>
 
         <button type="submit" className="submit-btn" disabled={loading}>
@@ -106,11 +142,8 @@ export default function Register() {
         </button>
       </form>
 
-      <div style={{ marginTop: '1.2rem', textAlign: 'center' }}>
-        <span>Уже есть аккаунт? </span>
-        <Link to="/login" style={{ color: 'var(--accent-color)' }}>
-          Войти
-        </Link>
+      <div className="demo-credentials">
+        Уже есть аккаунт? <Link to="/login">Войти</Link>
       </div>
     </div>
   );

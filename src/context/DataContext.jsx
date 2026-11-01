@@ -1,137 +1,84 @@
-import { createContext, useState, useEffect, useContext } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 const DataContext = createContext();
+
+export const API_URL = 'http://localhost:5000/api';
 
 export function DataProvider({ children }) {
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [user, setUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem('techstore_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      return null;
-    }
-  });
+  const [reviews, setReviews] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
 
-  const fetchData = async () => {
+  const fetchAllData = async () => {
     setLoading(true);
-    setError('');
+    setError(null);
     try {
-      const resServices = await fetch('http://localhost:5000/api/services');
-      const resCategories = await fetch('http://localhost:5000/api/categories');
+      const [servRes, catRes] = await Promise.all([
+        fetch(`${API_URL}/services`),
+        fetch(`${API_URL}/categories`),
+      ]);
 
-      if (!resServices.ok || !resCategories.ok) {
-        throw new Error('Ошибка получения данных с сервера');
+      const servData = servRes.ok ? await servRes.json() : [];
+      const catData = catRes.ok ? await catRes.json() : [];
+
+      setServices(Array.isArray(servData) ? servData : []);
+      setCategories(Array.isArray(catData) ? catData : []);
+
+      try {
+        const revRes = await fetch(`${API_URL}/reviews`);
+        if (revRes.ok) {
+          const revData = await revRes.json();
+          setReviews(Array.isArray(revData) ? revData : []);
+        }
+      } catch (_) {
+        setReviews([]);
       }
 
-      const servicesData = await resServices.json();
-      const categoriesData = await resCategories.json();
-
-      setServices(servicesData);
-      setCategories(categoriesData);
+      try {
+        const usrRes = await fetch(`${API_URL}/users`);
+        if (usrRes.ok) {
+          const usrData = await usrRes.json();
+          setUsers(Array.isArray(usrData) ? usrData : []);
+        }
+      } catch (_) {
+        setUsers([]);
+      }
     } catch (err) {
-      setError(err.message || 'Не удалось подключиться к серверу API');
+      setError('Не удалось подключиться к серверу (проверьте, запущен ли node server.js на порту 5000)');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchAllData();
   }, []);
 
-  const addCategory = async (name) => {
-    const res = await fetch('http://localhost:5000/api/categories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Ошибка добавления категории');
-    }
-    setCategories([...categories, data]);
-  };
-
-  const updateCategory = async (id, name) => {
-    const res = await fetch(`http://localhost:5000/api/categories/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Ошибка обновления категории');
-    }
-    setCategories(categories.map((c) => (c.id === Number(id) ? data : c)));
-    fetchData();
-  };
-
-  const deleteCategory = async (id) => {
-    const res = await fetch(`http://localhost:5000/api/categories/${id}`, {
-      method: 'DELETE',
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Ошибка удаления категории');
-    }
-    setCategories(categories.filter((c) => c.id !== Number(id)));
-    fetchData();
-  };
-
-  const registerUser = async (email, password, full_name) => {
-    const res = await fetch('http://localhost:5000/api/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, full_name }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Ошибка регистрации');
-    }
-    setUser(data);
-    localStorage.setItem('techstore_user', JSON.stringify(data));
-    return data;
-  };
-
-  const loginUser = async (email, password) => {
-    const res = await fetch('http://localhost:5000/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Ошибка входа');
-    }
-    setUser(data);
-    localStorage.setItem('techstore_user', JSON.stringify(data));
-    return data;
-  };
-
-  const logoutUser = () => {
-    setUser(null);
-    localStorage.removeItem('techstore_user');
-  };
+  const logout = () => setUser(null);
 
   return (
     <DataContext.Provider
       value={{
         services,
+        setServices,
         categories,
+        setCategories,
+        reviews,
+        setReviews,
+        users,
+        setUsers,
         user,
+        setUser,
+        currentUser: user,
+        setCurrentUser: setUser,
+        logout,
         loading,
         error,
-        fetchData,
-        addCategory,
-        updateCategory,
-        deleteCategory,
-        registerUser,
-        loginUser,
-        logoutUser,
+        fetchAllData,
       }}
     >
       {children}
@@ -139,6 +86,4 @@ export function DataProvider({ children }) {
   );
 }
 
-export function useData() {
-  return useContext(DataContext);
-}
+export const useData = () => useContext(DataContext);

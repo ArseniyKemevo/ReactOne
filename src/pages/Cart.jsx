@@ -1,92 +1,119 @@
-import { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { useData } from '../context/DataContext';
+import { useData, API_URL } from '../context/DataContext';
 
 export default function Cart() {
-  const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
+  const { cart, cartLoading, cartError, updateQuantity, removeFromCart, fetchCart } = useCart();
   const { user } = useData();
-  const [statusMsg, setStatusMsg] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  if (user && user.role === 'admin') {
-    return <Navigate to="/admin" />;
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState('');
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCouponDiscount, setAppliedCouponDiscount] = useState(0);
+
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
+  const [checkoutSuccess, setCheckoutSuccess] = useState('');
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  useEffect(() => {
+    if (user && user.default_address && !deliveryAddress) {
+      setDeliveryAddress(user.default_address);
+    }
+  }, [user]);
+
+  if (!user) {
+    return (
+      <div className="form-container">
+        <h1>Корзина</h1>
+        <p>Для работы с корзиной необходимо авторизоваться.</p>
+        <Link to="/login" className="btn-link">
+          Перейти ко входу
+        </Link>
+      </div>
+    );
   }
 
-  const getServiceImage = (service) => {
-    if (service.image && service.image !== '/images/hardware.jpg') {
-      return service.image;
+  if (cartLoading) return <div className="status-box loading-box">Загрузка вашей корзины...</div>;
+  if (cartError) return <div className="status-box error-box">{cartError}</div>;
+
+  const handleApplyCoupon = () => {
+    if (
+      user.coupon_code &&
+      couponInput.trim().toUpperCase() === user.coupon_code.toUpperCase()
+    ) {
+      setAppliedCouponDiscount(user.personal_discount || 0);
+      setCheckoutError('');
+    } else {
+      setAppliedCouponDiscount(0);
+      setCheckoutError('Неверный промокод');
     }
-    const title = (service.title || '').toLowerCase();
-    if (title.includes('мышь')) return '/images/mouse.png';
-    if (title.includes('клавиатур')) return '/images/keyboard.jpg';
-    if (title.includes('монитор')) return '/images/monitor.jpg';
-    if (title.includes('коврик')) return '/images/kover.jpg';
-    if (title.includes('хаб') || title.includes('ssd') || title.includes('память') || title.includes('сборка')) return '/images/hub.jpg';
-    if (title.includes('наушник') || title.includes('гарнитур')) return '/images/yshi.jpg';
-    return '/images/hardware.jpg';
   };
 
-  const getDiscountedPrice = (item) => {
-    const basePrice = Number(item.price);
-    const itemDiscount = Number(item.discount_percent) || 0;
-    const userDiscount = user ? Number(user.personal_discount) || 0 : 0;
-    const totalDiscount = Math.min(itemDiscount + userDiscount, 90);
-    return Math.round(basePrice * (1 - totalDiscount / 100));
-  };
+  const subtotal = cart.reduce((acc, item) => {
+    const unitPrice = Math.round(item.price * (1 - (item.discount_percent || 0) / 100));
+    return acc + unitPrice * item.count;
+  }, 0);
 
-  const totalAmount = cart.reduce(
-    (sum, item) => sum + getDiscountedPrice(item) * item.count,
-    0
-  );
+  const totalAmount = Math.round(subtotal * (1 - appliedCouponDiscount / 100));
 
-  const handleCheckout = async () => {
-    setLoading(true);
-    setStatusMsg('');
-    setErrorMsg('');
+  const handleCheckout = async (e) => {
+    e.preventDefault();
+    setCheckoutError('');
+    setCheckoutSuccess('');
+
+    if (!deliveryAddress.trim() || deliveryAddress.trim().length < 5) {
+      setCheckoutError('Пожалуйста, введите полный адрес доставки (минимум 5 символов)');
+      return;
+    }
+    if (!deliveryDate) {
+      setCheckoutError('Пожалуйста, выберите дату доставки');
+      return;
+    }
+    if (deliveryDate < todayStr) {
+      setCheckoutError('Ошибка: дата доставки не может быть меньше текущей даты!');
+      return;
+    }
+
+    setCheckoutLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/checkout', {
+      const res = await fetch(`${API_URL}/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: user ? user.id : null,
+          user_id: user.id,
           items: cart,
           total_amount: totalAmount,
-        }),
+          delivery_address: deliveryAddress.trim(),
+          delivery_date: deliveryDate
+        })
       });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Ошибка оформления заказа');
-      }
-      setStatusMsg(data.message);
-      clearCart();
+      if (!res.ok) throw new Error(data.error || 'Ошибка оформления заказа');
+
+      setCheckoutSuccess(
+        `Заказ успешно оформлен на сумму ${totalAmount} ₽! Доставка запланирована на ${deliveryDate}.`
+      );
+      await fetchCart();
     } catch (err) {
-      setErrorMsg(err.message);
+      setCheckoutError(err.message);
     } finally {
-      setLoading(false);
+      setCheckoutLoading(false);
     }
   };
 
   return (
     <div>
-      <h1>Корзина</h1>
+      <h1>Ваша корзина</h1>
 
-      {statusMsg && (
-        <div className="status-box success-box">
-          <span>{statusMsg}</span>
-        </div>
-      )}
-
-      {errorMsg && (
-        <div className="status-box error-box">
-          <span>{errorMsg}</span>
-        </div>
-      )}
+      {checkoutSuccess && <div className="status-box success-box">{checkoutSuccess}</div>}
+      {checkoutError && <div className="status-box error-box">{checkoutError}</div>}
 
       {cart.length === 0 ? (
         <div>
-          <p>Ваша корзина пуста.</p>
+          <p>В вашей корзине пока пусто.</p>
           <Link to="/" className="btn-link">
             Перейти в каталог
           </Link>
@@ -97,8 +124,9 @@ export default function Cart() {
             <table className="cart-table">
               <thead>
                 <tr>
-                  <th>Наименование</th>
-                  <th>Цена</th>
+                  <th>Товар / Услуга</th>
+                  <th>Категория</th>
+                  <th>Цена за шт.</th>
                   <th>Количество</th>
                   <th>Сумма</th>
                   <th>Действие</th>
@@ -106,66 +134,49 @@ export default function Cart() {
               </thead>
               <tbody>
                 {cart.map((item) => {
-                  const finalPrice = getDiscountedPrice(item);
-                  const basePrice = Number(item.price);
-
+                  const unitPrice = Math.round(
+                    item.price * (1 - (item.discount_percent || 0) / 100)
+                  );
                   return (
-                    <tr key={item.id}>
+                    <tr key={item.title}>
                       <td>
                         <div className="cart-item-cell">
-                          <img
-                            className="cart-item-img"
-                            src={getServiceImage(item)}
-                            alt={item.title}
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src = '/images/hub.jpg';
-                            }}
-                          />
+                          <img src={item.image} alt={item.title} className="cart-item-img" />
                           <div>
-                            <div>
-                              <strong>{item.title}</strong>
-                              {finalPrice < basePrice && (
-                                <span className="table-discount-badge">Скидка</span>
-                              )}
-                            </div>
-                            <small style={{ color: 'var(--text-muted)' }}>
-                              {item.category_name}
-                            </small>
+                            <strong>{item.title}</strong>
+                            {item.discount_percent > 0 && (
+                              <span className="table-discount-badge">
+                                -{item.discount_percent}%
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>
-                      <td>
-                        {finalPrice < basePrice ? (
-                          <>
-                            <span className="old-price-inline">{basePrice} ₽</span>{' '}
-                            <strong>{finalPrice} ₽</strong>
-                          </>
-                        ) : (
-                          <span>{basePrice} ₽</span>
-                        )}
-                      </td>
+                      <td>{item.category_name}</td>
+                      <td>{unitPrice} ₽</td>
                       <td>
                         <div className="quantity-controls">
                           <button
                             className="quantity-btn"
-                            onClick={() => updateQuantity(item.id, -1)}
+                            onClick={() => updateQuantity(item.id, item.count - 1)}
                           >
                             -
                           </button>
                           <span className="quantity-value">{item.count}</span>
                           <button
                             className="quantity-btn"
-                            onClick={() => updateQuantity(item.id, 1)}
+                            onClick={() => updateQuantity(item.id, item.count + 1)}
                           >
                             +
                           </button>
                         </div>
                       </td>
-                      <td>{finalPrice * item.count} ₽</td>
+                      <td>
+                        <strong>{unitPrice * item.count} ₽</strong>
+                      </td>
                       <td>
                         <button
-                          className="delete-btn"
+                          className="delete-btn btn-secondary"
                           onClick={() => removeFromCart(item.id)}
                         >
                           Удалить
@@ -179,19 +190,57 @@ export default function Cart() {
           </div>
 
           <div className="cart-summary">
-            <h2>Итого к оплате: {totalAmount} ₽</h2>
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-              <button className="reset-btn" onClick={clearCart}>
-                Очистить корзину
-              </button>
-              <button
-                className="submit-btn"
-                onClick={handleCheckout}
-                disabled={loading}
-              >
-                {loading ? 'Оформление...' : 'Оформить заказ'}
+            <div style={{ marginBottom: '1rem' }}>
+              <input
+                type="text"
+                placeholder="Промокод (напр. WELCOME10)"
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value)}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  marginRight: '0.5rem',
+                  background: 'var(--surface-color)',
+                  color: 'var(--text-color)'
+                }}
+              />
+              <button className="btn-secondary" onClick={handleApplyCoupon}>
+                Применить промокод
               </button>
             </div>
+            <h3>Итого к оплате: {totalAmount} ₽</h3>
+          </div>
+
+          <div className="form-container" style={{ maxWidth: '520px', marginTop: '2rem' }}>
+            <h2>Оформление доставки</h2>
+            <form onSubmit={handleCheckout} className="login-form">
+              <div className="form-group">
+                <label>Адрес доставки *</label>
+                <input
+                  type="text"
+                  placeholder="Город, улица, дом, квартира"
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Дата доставки (не ранее сегодняшнего дня) *</label>
+                <input
+                  type="date"
+                  min={todayStr}
+                  value={deliveryDate}
+                  onChange={(e) => setDeliveryDate(e.target.value)}
+                  required
+                />
+              </div>
+
+              <button type="submit" className="submit-btn" disabled={checkoutLoading}>
+                {checkoutLoading ? 'Оформляем заказ...' : 'Оформить заказ'}
+              </button>
+            </form>
           </div>
         </>
       )}

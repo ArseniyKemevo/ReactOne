@@ -1,34 +1,43 @@
-import { NavLink } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
+import { useCart } from '../context/CartContext';
 
 export default function Navbar() {
-  const { cart } = useCart();
   const { theme, toggleTheme } = useTheme();
-  const { user } = useData();
+  const { user, logout } = useData();
+  const { cart } = useCart();
+  const navigate = useNavigate();
 
-  const totalCount = cart.reduce((sum, item) => sum + item.count, 0);
+  const totalCount = cart.reduce((sum, item) => sum + Number(item.count || 1), 0);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
-    <nav className="navbar">
-      <h2>TechStore</h2>
-      <div className="nav-links">
-        <NavLink to="/">Каталог</NavLink>
-        
-        {(!user || user.role !== 'admin') && (
-          <NavLink to="/cart">
-            Корзина
-            {totalCount > 0 && <span className="cart-badge">{totalCount}</span>}
-          </NavLink>
-        )}
+    <header className="navbar">
+      <div style={{ fontWeight: 'bold', fontSize: '1.25rem' }}>
+        Трофей
+      </div>
 
-        {user && user.role === 'admin' && (
-          <NavLink to="/admin">Админ-панель</NavLink>
-        )}
+      <nav className="nav-links">
+        <NavLink to="/">Каталог</NavLink>
+
+        <NavLink to="/cart">
+          Корзина
+          {totalCount > 0 && <span className="cart-badge">{totalCount}</span>}
+        </NavLink>
 
         {user ? (
-          <NavLink to="/dashboard">Профиль ({user.full_name})</NavLink>
+          <>
+            <NavLink to="/dashboard">Личный кабинет ({user.full_name})</NavLink>
+            {user.role === 'admin' && <NavLink to="/admin">Админ-панель</NavLink>}
+            <button className="delete-btn btn-secondary" onClick={handleLogout}>
+              Выйти
+            </button>
+          </>
         ) : (
           <>
             <NavLink to="/login">Вход</NavLink>
@@ -36,10 +45,10 @@ export default function Navbar() {
           </>
         )}
 
-        <button onClick={toggleTheme}>
-          {theme === 'light' ? 'Темная тема' : 'Светлая тема'}
+        <button className="btn-secondary" onClick={toggleTheme}>
+          {theme === 'dark' ? 'Светлая' : 'Темная'}
         </button>
-      </div>
-    </nav>
+      </nav>
+    </header>
   );
 }
