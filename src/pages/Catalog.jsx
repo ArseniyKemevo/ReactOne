@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useData, API_URL } from '../context/DataContext';
 import { useCart } from '../context/CartContext';
 
+const containsProfanity = (text) => /бляд|блят|бля|сука|хуй|пизд|еба|ёба|мудак|гандон|нахуй|нахер/iu.test(text);
+
 export default function Catalog() {
   const { services, categories, reviews, setReviews, user, loading, error } = useData();
   const { addToCart } = useCart();
@@ -37,6 +39,10 @@ export default function Catalog() {
 
     if (!comment.trim() || comment.trim().length < 5) {
       setReviewError('Комментарий должен содержать минимум 5 символов');
+      return;
+    }
+    if (containsProfanity(comment.trim())) {
+      setReviewError('Отзыв содержит недопустимые выражения');
       return;
     }
 

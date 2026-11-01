@@ -22,8 +22,9 @@ export default function Register() {
   }, [user, navigate]);
 
   const validateForm = () => {
-    if (!fullName.trim() || fullName.trim().length < 3) {
-      return 'Введите корректное полное имя (минимум 3 символа)';
+    const fullNameRegex = /^[А-ЯЁA-Z][а-яёa-z]+(?:[- ][А-ЯЁA-Z][а-яёa-z]+){1,2}$/u;
+    if (!fullNameRegex.test(fullName.trim().replace(/\s+/g, ' '))) {
+      return 'Введите ФИО: от 2 до 3 слов, только буквы, пробел и дефис';
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {

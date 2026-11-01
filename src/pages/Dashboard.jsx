@@ -60,8 +60,9 @@ export default function Dashboard() {
     setProfileMsg('');
     setProfileErr('');
 
-    if (!fullName.trim() || fullName.trim().length < 3) {
-      setProfileErr('ФИО должно содержать минимум 3 символа');
+    const fullNameRegex = /^[А-ЯЁA-Z][а-яёa-z]+(?:[- ][А-ЯЁA-Z][а-яёa-z]+){1,2}$/u;
+    if (!fullNameRegex.test(fullName.trim().replace(/\s+/g, ' '))) {
+      setProfileErr('Введите ФИО: от 2 до 3 слов, только буквы, пробел и дефис');
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -7,6 +7,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const fullNamePattern = /^[А-ЯЁA-Z][а-яёa-z]+(?:[- ][А-ЯЁA-Z][а-яёa-z]+){1,2}$/u;
+const profanityPattern = /бляд|блят|бля|сука|хуй|пизд|еба|ёба|мудак|гандон|нахуй|нахер/iu;
+
+const normalizeFullName = (value) => String(value || '').trim().replace(/\s+/g, ' ');
+const isValidFullName = (value) => fullNamePattern.test(normalizeFullName(value));
+const containsProfanity = (value) => profanityPattern.test(String(value || ''));
+
 const pool = new Pool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
@@ -177,6 +184,9 @@ app.post('/api/register', async (req, res) => {
   if (!email || !password || !full_name) {
     return res.status(400).json({ error: 'Заполните обязательные поля' });
   }
+  if (!isValidFullName(full_name)) {
+    return res.status(400).json({ error: 'ФИО должно состоять из 2–3 слов и содержать только буквы, пробел и дефис' });
+  }
   try {
     const existing = await pool.query('SELECT id FROM Users WHERE LOWER(email) = LOWER($1)', [email.trim()]);
     if (existing.rows.length > 0) {
@@ -189,7 +199,7 @@ app.post('/api/register', async (req, res) => {
       `INSERT INTO Users (email, password, full_name, phone, default_address, role_id, coupon_code, personal_discount)
        VALUES ($1, $2, $3, $4, $5, $6, 'WELCOME10', 10)
        RETURNING id, email, full_name, phone, default_address, coupon_code, personal_discount, 'client' AS role`,
-      [email.trim(), password, full_name.trim(), (phone || '+79990000000').trim(), (default_address || '').trim(), roleId]
+      [email.trim(), password, normalizeFullName(full_name), (phone || '+79990000000').trim(), (default_address || '').trim(), roleId]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -249,10 +259,13 @@ app.post('/api/reset-password', async (req, res) => {
 app.put('/api/users/:id/profile', async (req, res) => {
   const { id } = req.params;
   const { full_name, email, phone, default_address } = req.body;
+  if (!isValidFullName(full_name)) {
+    return res.status(400).json({ error: 'ФИО должно состоять из 2–3 слов и содержать только буквы, пробел и дефис' });
+  }
   try {
     await pool.query(
       'UPDATE Users SET full_name = $1, email = $2, phone = $3, default_address = $4 WHERE id = $5',
-      [full_name.trim(), email.trim(), (phone || '').trim(), (default_address || '').trim(), id]
+      [normalizeFullName(full_name), email.trim(), (phone || '').trim(), (default_address || '').trim(), id]
     );
     const updated = await pool.query(
       `SELECT u.id, u.email, u.full_name, u.phone, u.default_address, u.coupon_code, u.personal_discount, r.name AS role
@@ -526,6 +539,15 @@ app.post('/api/reviews', async (req, res) => {
   const { user_id, service_id, rating, comment } = req.body;
   if (!user_id || !service_id || !comment) {
     return res.status(400).json({ error: 'Заполните отзыв' });
+  }
+  if (comment.trim().length < 5 || comment.trim().length > 1000) {
+    return res.status(400).json({ error: 'Текст отзыва должен содержать от 5 до 1000 символов' });
+  }
+  if (containsProfanity(comment)) {
+    return res.status(400).json({ error: 'Отзыв содержит недопустимые выражения' });
+  }
+  if (!Number.isInteger(Number(rating || 5)) || Number(rating || 5) < 1 || Number(rating || 5) > 5) {
+    return res.status(400).json({ error: 'Оценка должна быть целым числом от 1 до 5' });
   }
   try {
     const insertRes = await pool.query(
